@@ -5,18 +5,23 @@
 #include <util/delay.h>
 #include <stdlib.h>
 
-/* PORTD pin 2 is used for the button (INT0 pin)        */
-#define BUTTON_BIT        2
+/* Updated to work with the newer hardware revision     */
 
-/* PORTB pins are used for the LEDs
+/* PORTD pin 2 is used for the button (INT0 pin)        */
+#define BUTTON_PIN        2
+
+#define SET_BIT(PORT_NR,BIT) (PORT_NR |= (1<<BIT))
+#define CLEAR_BIT(PORT_NR,BIT) (PORT_NR &= ~(1<<BIT))
+
+/* PORTB and PORTD pins are used for the LEDs
  * Define Pins for the LEDs
  */
 
 /* Left LEDs    */
-#define LEFT_LED4       PB7
-#define LEFT_LED2LED6   PB6
-#define LEFT_LED1LED7   PB5
-#define LEFT_LED3LED5   PB4
+#define LEFT_LED4       PD6
+#define LEFT_LED2LED6   PD5
+#define LEFT_LED1LED7   PD4
+#define LEFT_LED3LED5   PD3
 
 /* Right LEDs   */
 #define RIGHT_LED4      PB3
@@ -33,24 +38,15 @@
  * 6 => 1 2 3 5 6 7
  */
 
-/* The ideal working code 
-const int left_leds[6] = {~(_BV(LEFT_LED4)), 
-                          ~(_BV(LEFT_LED2LED6)),
-                          ~(_BV(LEFT_LED2LED6))+~(_BV(LEFT_LED4)),
-                          ~(_BV(LEFT_LED2LED6))+~(_BV(LEFT_LED1LED7)),
-                          ~(_BV(LEFT_LED2LED6))+~(_BV(LEFT_LED1LED7))+~(_BV(LEFT_LED4)),
-                          ~(_BV(LEFT_LED2LED6))+~(_BV(LEFT_LED1LED7))+~(_BV(LEFT_LED3LED5))};
-
-const int right_leds[6] = {~(_BV(RIGHT_LED4)), 
-                          ~(_BV(RIGHT_LED2LED6)),
-                          ~(_BV(RIGHT_LED2LED6))+~(_BV(RIGHT_LED4)),
-                          ~(_BV(RIGHT_LED2LED6))+~(_BV(RIGHT_LED1LED7)),
-                          ~(_BV(RIGHT_LED2LED6))+~(_BV(RIGHT_LED1LED7))+~(_BV(RIGHT_LED4)),
-                          ~(_BV(RIGHT_LED2LED6))+~(_BV(RIGHT_LED1LED7))+~(_BV(RIGHT_LED3LED5))};
+/*SET_BIT(PORTD,3);_delay_ms(500);PORTD = 0x00;
+SET_BIT(PORTD,4);_delay_ms(500);PORTD = 0x00;
+SET_BIT(PORTD,3);SET_BIT(PORTD,4);_delay_ms(500);PORTD = 0x00;
+SET_BIT(PORTD,5);SET_BIT(PORTD,4);_delay_ms(500);PORTD = 0x00;
+SET_BIT(PORTD,5);SET_BIT(PORTD,4);SET_BIT(PORTD,3);_delay_ms(500);PORTD = 0x00;
+SET_BIT(PORTD,6);SET_BIT(PORTD,5);SET_BIT(PORTD,4);_delay_ms(500);PORTD = 0x00;
 */
 
-/* The working code :)  */
-const int L_leds[6] = { 8, 4, 12, 6, 14, 7};
+const int L_leds[6] = { 8, 16, 24, 48, 56, 112};
 const int R_leds[6] = { 8, 4, 12, 6, 14, 7};
 
 static int dice=0;
@@ -61,30 +57,33 @@ ISR(INT0_vect)
          * and display the value for 5 seconds
          */
         srand(TCNT1);
-        dice = L_leds[rand() % 6] * 0x10 + R_leds[rand() % 6];
-        PORTB = ~dice;
+        PORTD = L_leds[rand() % 6];
+        PORTB = R_leds[rand() % 6];
         _delay_ms(5000);
-        PORTB=0xFF;
+        PORTB=0x00;
+        PORTD=0x00;
                 
         /* Debounce     */
-        loop_until_bit_is_set(PIND,BUTTON_BIT);
+        loop_until_bit_is_clear(PIND,BUTTON_PIN);
 }
 
 int main (void)
 {
         int i=0;
 
-        /* PortB is used for output     */
+        /* PortB and PortD are used for output     */
         DDRB = 0xFF;
+        DDRD = 0xFF;
 
-        /* All port pins to High Level = LEDs OFF       */
-        PORTB = 0xFF;
+        /* All port pins to Low Level = LEDs OFF       */
+        PORTB = 0x00;
+        PORTD = 0x00;
 
-        /* PortD is used for input      */
-        DDRD = 0x00;
+        /* PortD pin BUTTON_PIN is used for input      */
+        DDRD &= ~BUTTON_PIN;
 
-        /* PortD enable the pull ups    */
-        PORTD = 0xFF;
+        /* PortD pin enable the pull ups    */
+        PORTD |= BUTTON_PIN;
 
         /* Setup a timer running. We will use it for random seed        */
         TCCR1B |= (1 << CS10);
@@ -96,16 +95,17 @@ int main (void)
 
         for (i=0;i<=5;i++)
         {
-                dice = L_leds[i]*0x10+R_leds[i];
-                PORTB = ~dice;
+                PORTD = PORTD | L_leds[i];
                 _delay_ms(500);
+                PORTD=0x00;
         }
 
-        /* All port pins to High Level = LEDs OFF       */
-        PORTB = 0xFF;
+        /* All port pins to Low Level = LEDs OFF       */
+        PORTB = 0x00;
+        PORTD = 0x00;
 
-        /* interrupt on INT0 (button) on low level      */
-        MCUCR = (0<<ISC01) | (0<<ISC00);
+        /* interrupt on INT0 (button) on high level      */
+        MCUCR = (1<<ISC01) | (1<<ISC00);
 
         /* Turn on interrupts   */
         GIMSK  |= (1<<INT0);
