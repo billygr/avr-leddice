@@ -52,12 +52,12 @@ const int R_leds[6] = { 8, 4, 12, 6, 14, 7};
 ISR(INT0_vect)
 {
         /* Generate a random value for the LEDs
-         * and display the value for 5 seconds
+         * and display the value for 3 seconds
          */
         srand(TCNT1);
         PORTD = PORTD | L_leds[rand() % 6];
         PORTB = PORTB | R_leds[rand() % 6];
-        _delay_ms(5000);
+        _delay_ms(3000);
         PORTB=0x00;
         PORTD=0x00;
 
@@ -71,19 +71,13 @@ int main (void)
 {
         int i=0;
 
-        /* PortB and PortD are used for output     */
+        /* PORTB and PORTD are used for output     */
         DDRB = 0xFF;
         DDRD = 0xFF;
 
         /* All port pins to Low Level = LEDs OFF       */
         PORTB = 0x00;
         PORTD = 0x00;
-
-        /* PortD pin BUTTON_PIN is used for input      */
-        //DDRD &= ~BUTTON_PIN;
-
-        /* PortD pin enable the pull ups    */
-        //PORTD |= BUTTON_PIN;
 
         /* Setup a timer running. We will use it for random seed        */
         TCCR1B |= (1 << CS10);
@@ -104,13 +98,12 @@ int main (void)
         PORTB = 0x00;
         PORTD = 0x00;
 
-        DDRD &= ~(1 << DDD2);     // Clear the PD2 pin
-        PORTD |= (1 << PORTD2);    // turn On the Pull-up
+        DDRD &= ~(1 << DDD2);       // Clear the PD2 pin (INT0)
+        PORTD |= (1 << PORTD2);     // Turn on the internal pull-up
 
-        /* interrupt on INT0 (button) on high level      */
-        //MCUCR = (1<<ISC01) | (1<<ISC00);
-        // Bug you cannot wake up from sleep with high
-
+        /* Interrupt on INT0 (button) on low level
+         * Only a low level can wake up the MCU from sleep
+        */
         MCUCR =(0<<ISC01) | (0<<ISC00);
 
         /* Turn on interrupts   */
